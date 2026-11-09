@@ -28,11 +28,11 @@ USER appuser
 COPY --from=builder /app/target/*.jar app.jar
 
 # Variáveis de ambiente configuráveis (compatíveis com Coolify)
-ENV PORT=8080 \
+ENV PORT=38458 \
     JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
 # Expõe a porta padrão
-EXPOSE 8080
+EXPOSE 38458
 
 # Executa o Spring Boot respeitando a porta definida pelo Coolify
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT} -jar app.jar"]
