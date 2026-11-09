@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="sl-theme-dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Analisador Léxico da Linguagem MaoMao — Digite ou carregue seu código .maomao e veja os tokens identificados.">
+    <title>🐱 Analisador Léxico, Sintático e Bottom-Up — Linguagem MaoMao</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css" />
+    <script type="module"
+        src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+
+    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐱</text></svg>">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <h1>Analisador Léxico, Sintático e Bottom-Up MaoMao</h1>
+            <p>Digite ou carregue seu código <strong>.maomao</strong> e analise os tokens</p>
+        </header>
+
+        <main class="main-grid">
+            <sl-card class="editor-card">
+                <div slot="header" class="card-header-content">
+                    <sl-icon name="code-slash" style="font-size: 1.2rem;"></sl-icon>
+                    <div>
+                        <strong>Código Fonte</strong>
+                        <small>Linguagem MaoMao</small>
+                    </div>
+                </div>
+
+                <div class="editor-wrapper">
+                    <div class="line-numbers" id="lineNumbers" aria-hidden="true">1</div>
+                    <textarea id="codeEditor" class="code-editor" placeholder="Digite seu código MaoMao aqui..."
+                        spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+                </div>
+
+                <div class="upload-zone" id="uploadZone">
+                    <sl-icon name="cloud-arrow-up"
+                        style="font-size: 2rem; color: var(--sl-color-primary-500);"></sl-icon>
+                    <strong>Carregar arquivo .maomao</strong>
+                    <small>Arraste e solte ou clique para selecionar</small>
+                    <div class="file-name" id="fileName"></div>
+                    <input type="file" class="file-input" id="fileInput" accept=".maomao">
+                </div>
+
+                <div class="actions-bar">
+                    <sl-button variant="primary" size="large" id="analyzeBtn" class="analyze-btn">
+                        <sl-icon slot="prefix" name="search"></sl-icon>
+                        Analisar
+                    </sl-button>
+                    <sl-button variant="default" size="large" id="clearBtn">
+                        <sl-icon slot="prefix" name="trash3"></sl-icon>
+                        Limpar
+                    </sl-button>
+                </div>
+            </sl-card>
+
+            <sl-card class="results-card">
+                <div slot="header" class="card-header-content">
+                    <sl-icon name="bar-chart-line" style="font-size: 1.2rem;"></sl-icon>
+                    <div>
+                        <strong>Resultados da Análise</strong>
+                        <small>Tokens identificados</small>
+                    </div>
+                </div>
+
+                <sl-alert variant="danger" id="errorMessage" closable>
+                    <sl-icon slot="icon" name="exclamation-octagon"></sl-icon>
+                    <span id="errorText"></span>
+                </sl-alert>
+
+                <div class="results-placeholder" id="resultsPlaceholder">
+                    <div class="placeholder-icon">😺</div>
+                    <h3>Nenhuma análise ainda</h3>
+                    <p>Digite seu código MaoMao e clique em "Analisar" para ver os tokens</p>
+                </div>
+
+                <div class="results-content" id="resultsContent">
+                    <div class="stats-bar">
+                        <sl-badge variant="primary" pill>
+                            🏷️ Total: <span id="totalTokens">0</span>
+                        </sl-badge>
+                        <sl-badge variant="success" pill>
+                            🎯 Únicos: <span id="uniqueTokens">0</span>
+                        </sl-badge>
+                        <sl-badge variant="danger" pill id="errorCount" class="hidden">
+                            ⚠️ Erros: <span id="errorCountValue">0</span>
+                        </sl-badge>
+                    </div>
+
+
+
+                    <sl-tab-group id="resultTabs">
+                        <sl-tab slot="nav" panel="analize" active>📝 Análise Sequencial</sl-tab>
+                        <sl-tab slot="nav" panel="tokens">📊 Tabela de Símbolos</sl-tab>
+                        <sl-tab slot="nav" panel="lexical">🔤 Erros Léxicos</sl-tab>
+                        <sl-tab slot="nav" panel="syntax">🌳 Erros de Sintaxe</sl-tab>
+                        <sl-tab slot="nav" panel="semantic">🧠 Erros de Semântica</sl-tab>
+
+                        <sl-tab-panel name="analize">
+                            <div class="table-wrapper">
+                                <table class="result-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 50px">#</th>
+                                            <th>Lexema</th>
+                                            <th>Descrição</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="analizeTableBody"></tbody>
+                                </table>
+                            </div>
+                        </sl-tab-panel>
+
+                        <sl-tab-panel name="tokens">
+                            <div class="table-wrapper">
+                                <table class="result-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Lexema</th>
+                                            <th>Descrição</th>
+                                            <th style="width: 80px; text-align: center">Qtd</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tokensTableBody"></tbody>
+                                </table>
+                            </div>
+                        </sl-tab-panel>
+
+                        <sl-tab-panel name="lexical">
+                            <div class="table-wrapper">
+                                <table class="result-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 50px">#</th>
+                                            <th>Erro léxico <span class="tab-count" id="lexicalCount">0</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="lexicalTableBody"></tbody>
+                                </table>
+                            </div>
+                        </sl-tab-panel>
+
+                        <sl-tab-panel name="syntax">
+                            <div class="table-wrapper">
+                                <table class="result-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 50px">#</th>
+                                            <th>Erro de sintaxe <span class="tab-count" id="syntaxCount">0</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="syntaxTableBody"></tbody>
+                                </table>
+                            </div>
+                        </sl-tab-panel>
+
+                        <sl-tab-panel name="semantic">
+                            <div class="table-wrapper">
+                                <table class="result-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 50px">#</th>
+                                            <th>Erro semântico <span class="tab-count" id="semanticCount">0</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="semanticTableBody"></tbody>
+                                </table>
+                            </div>
+                        </sl-tab-panel>
+                    </sl-tab-group>
+                </div>
+            </sl-card>
+        </main>
+
+        <!-- ===== Seção Bottom-Up ===== -->
+        <section class="bottomup-section" style="margin-top: var(--sl-spacing-2x-large);">
+            <sl-divider></sl-divider>
+            <header class="header" style="margin-bottom: var(--sl-spacing-large);">
+                <h1>⬆️ Analisador Sintático Bottom-Up (SLR)</h1>
+                <p>Gramática do <strong>Laço de Repetição (rrr-rrr)</strong> na Linguagem MaoMao</p>
+            </header>
+
+            <div class="main-grid">
+                <sl-card class="editor-card">
+                    <div slot="header" class="card-header-content">
+                        <sl-icon name="code-slash" style="font-size: 1.2rem;"></sl-icon>
+                        <div>
+                            <strong>Entrada do Laço (MaoMao)</strong>
+                            <small>Ex: rrr-rrr ..... Mao_ i _Mao ow&lt; 10 ..... 🐈 ... 🐈‍⬛</small>
+                        </div>
+                    </div>
+
+                    <div class="editor-wrapper">
+                        <textarea id="buCodeEditor" class="code-editor" style="min-height: 160px;"
+                            placeholder="Digite o laço MaoMao aqui..." spellcheck="false" autocomplete="off"
+                            autocorrect="off" autocapitalize="off">rrr-rrr ..... Mao_ i _Mao ow&lt; 10 ..... 🐈
+    Mao_ i _Mao Pspsps Mao_ i _Mao +w+ 1!
+🐈‍⬛</textarea>
+                    </div>
+
+                    <div style="margin-top: var(--sl-spacing-small);">
+                        <sl-details summary="📖 Gramática do Laço MaoMao">
+                            <div
+                                style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; line-height: 1.8;">
+                                S → laco<br>
+                                laco → rrr-rrr ..... cond ..... bloco<br>
+                                cond → expr RELOP expr<br>
+                                bloco → 🐈 lista 🐈‍⬛<br>
+                                lista → lista comando | comando<br>
+                                comando → VAR Pspsps expr !<br>
+                                expr → expr +w+ termo | termo<br>
+                                termo → termo *w* fator | fator<br>
+                                fator → NUM | VAR
+                            </div>
+                        </sl-details>
+                    </div>
+
+                    <div class="actions-bar">
+                        <sl-button variant="primary" size="large" id="buAnalyzeBtn" class="analyze-btn">
+                            <sl-icon slot="prefix" name="play-fill"></sl-icon>
+                            Analisar Laço
+                        </sl-button>
+                        <sl-button variant="default" size="large" id="buClearBtn">
+                            <sl-icon slot="prefix" name="trash3"></sl-icon>
+                            Limpar
+                        </sl-button>
+                    </div>
+                </sl-card>
+
+                <sl-card class="results-card">
+                    <div slot="header" class="card-header-content">
+                        <sl-icon name="bar-chart-line" style="font-size: 1.2rem;"></sl-icon>
+                        <div>
+                            <strong>Resultado da Análise Bottom-Up</strong>
+                            <small>Passos do parser SLR</small>
+                        </div>
+                    </div>
+
+                    <sl-alert variant="danger" id="buErrorMessage" closable>
+                        <sl-icon slot="icon" name="exclamation-octagon"></sl-icon>
+                        <span id="buErrorText"></span>
+                    </sl-alert>
+
+                    <div class="results-placeholder" id="buResultsPlaceholder">
+                        <div class="placeholder-icon">⬆️</div>
+                        <h3>Nenhuma análise Bottom-Up ainda</h3>
+                        <p>Digite uma expressão e clique em "Analisar Laço"</p>
+                    </div>
+
+                    <div class="results-content" id="buResultsContent">
+                        <sl-tab-group id="buResultTabs">
+                            <sl-tab slot="nav" panel="bu-passos" active>📋 Passos da Análise</sl-tab>
+                            <sl-tab slot="nav" panel="bu-tabela">📊 Tabela SLR</sl-tab>
+                            <sl-tab slot="nav" panel="bu-erros">⚠️ Erros</sl-tab>
+
+                            <sl-tab-panel name="bu-passos">
+                                <div class="table-wrapper" style="max-height: 600px;">
+                                    <table class="result-table bu-steps-table">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 55px; text-align: center;">#</th>
+                                                <th style="min-width: 500px;">Pilha</th>
+                                                <th style="min-width: 500px;">Entrada Restante</th>
+                                                <th style="min-width: 250px;">Ação Realizada</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="buPassosTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </sl-tab-panel>
+
+                            <sl-tab-panel name="bu-tabela">
+                                <div class="table-wrapper" style="max-height: 600px; overflow-x: auto;">
+                                    <table class="result-table bu-slr-table" id="buTabelaSLR">
+                                        <thead>
+                                            <tr>
+                                                <th rowspan="2" class="th-estado">Estado</th>
+                                                <th colspan="12" class="th-grupo-action">Terminais</th>
+                                                <th colspan="9" class="th-grupo-goto">Não-Terminais</th>
+                                            </tr>
+                                            <tr id="buTabelaSubheader">
+                                            </tr>
+                                        </thead>
+                                        <tbody id="buTabelaTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </sl-tab-panel>
+
+                            <sl-tab-panel name="bu-erros">
+                                <div class="table-wrapper">
+                                    <table class="result-table">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 50px">#</th>
+                                                <th>Erro</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="buErrosTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </sl-tab-panel>
+                        </sl-tab-group>
+                    </div>
+                </sl-card>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <sl-divider></sl-divider>
+            <p>🐾 Linguagem MaoMao — Analisador Léxico, Sintático e Bottom-Up &copy; 2026</p>
+        </footer>
+    </div>
+
+    <script src="script.js?v=2"></script>
+</body>
+
+</html>
