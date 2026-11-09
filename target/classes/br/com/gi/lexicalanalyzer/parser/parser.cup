@@ -1,0 +1,228 @@
+package br.com.gi.lexicalanalyzer.parser;
+
+import java_cup.runtime.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+parser code {:
+    /* ================= Erros sintáticos ================= */
+    public List<String> erros = new ArrayList<>();
+
+    @Override
+    public void report_error(String message, Object info) {
+        String local = "";
+        if (info instanceof Symbol) {
+            Symbol s = (Symbol) info;
+            if (s.left >= 0) {
+                local = "Linha " + s.left + ", coluna " + s.right + ": ";
+            }
+        }
+        erros.add(local + message);
+    }
+
+    @Override
+    public void syntax_error(Symbol cur) {
+        String lexema = cur.value != null ? " perto de '" + cur.value + "'" : " (fim de arquivo inesperado)";
+        report_error("Erro sintático" + lexema, cur);
+    }
+
+    @Override
+    public void unrecovered_syntax_error(Symbol cur) throws Exception {
+        report_error("Erro sintático irrecuperável", cur);
+    }
+
+    /* ================= Análise semântica ================= */
+    public static final String ERRO    = "?";
+    public static final String INT     = "int";
+    public static final String FLOAT   = "float";
+    public static final String STRING  = "String";
+    public static final String BOOLEAN = "boolean";
+
+    public List<String> errosSemanticos = new ArrayList<>();
+    private final Map<String, String> tabela = new HashMap<>();
+
+    void semantico(int linha, String msg) {
+        errosSemanticos.add("Linha " + linha + ": " + msg);
+    }
+
+    private boolean numerico(String t) {
+        return INT.equals(t) || FLOAT.equals(t);
+    }
+
+    void declarar(String nome, String tipo, int linha) {
+        if (tabela.containsKey(nome)) {
+            semantico(linha, "Variável '" + nome + "' já foi declarada");
+        } else {
+            tabela.put(nome, tipo);
+        }
+    }
+
+    String tipoDe(String nome, int linha) {
+        String t = tabela.get(nome);
+        if (t == null) {
+            semantico(linha, "Variável '" + nome + "' não foi declarada");
+            return ERRO;
+        }
+        return t;
+    }
+
+    void checarAtribuicao(String destino, String origem, String nome, int linha) {
+        if (ERRO.equals(destino) || ERRO.equals(origem) || destino == null || origem == null) return;
+        boolean ok = destino.equals(origem) || (FLOAT.equals(destino) && INT.equals(origem));
+        if (!ok) {
+            semantico(linha, "Tipos incompatíveis: não é possível atribuir " + origem
+                    + " à variável '" + nome + "' do tipo " + destino);
+        }
+    }
+
+    String aritmetico(String a, String b, String op, int linha) {
+        if (ERRO.equals(a) || ERRO.equals(b) || a == null || b == null) return ERRO;
+        if ("+w+".equals(op) && (STRING.equals(a) || STRING.equals(b))) return STRING;
+        if (numerico(a) && numerico(b)) {
+            return (INT.equals(a) && INT.equals(b)) ? INT : FLOAT;
+        }
+        semantico(linha, "Operador '" + op + "' não pode ser aplicado a " + a + " e " + b);
+        return ERRO;
+    }
+
+    String raiz(String a, int linha) {
+        if (ERRO.equals(a) || a == null) return ERRO;
+        if (numerico(a)) return FLOAT;
+        semantico(linha, "Operador 'vwv' não pode ser aplicado a " + a);
+        return ERRO;
+    }
+
+    String relacional(String a, String b, String op, int linha) {
+        if (ERRO.equals(a) || ERRO.equals(b) || a == null || b == null) return BOOLEAN;
+        if (numerico(a) && numerico(b)) return BOOLEAN;
+        boolean igualdade = "=w=".equals(op) || "!w!".equals(op);
+        if (igualdade && a.equals(b)) return BOOLEAN;
+        semantico(linha, "Operador '" + op + "' não pode comparar " + a + " com " + b);
+        return BOOLEAN;
+    }
+
+    String logico(String a, String b, String op, int linha) {
+        if (ERRO.equals(a) || ERRO.equals(b) || a == null || b == null) return BOOLEAN;
+        if (!BOOLEAN.equals(a) || !BOOLEAN.equals(b)) {
+            semantico(linha, "Operador '" + op + "' exige operandos boolean, encontrado " + a + " e " + b);
+        }
+        return BOOLEAN;
+    }
+
+    void condicao(String t, String comando, int linha) {
+        if (ERRO.equals(t) || t == null) return;
+        if (!BOOLEAN.equals(t)) {
+            semantico(linha, "A condição do " + comando + " deve ser boolean, mas é " + t);
+        }
+    }
+:};
+
+/* ---------- Terminais ---------- */
+terminal MAO_ABRE, MAO_FECHA, PILULA;
+terminal T_BOOLEAN, T_STRING, T_INT, T_FLOAT;
+terminal IF, ELSE, WHILE, MAIN, PUBLIC, PRIVATE, FINAL, STATIC;
+terminal INPUT, OUTPUT, ASSIGN, CLASS, RETURN, VOID;
+terminal ABRE_BLOCO, FECHA_BLOCO, FIM, PAREN;
+terminal GE, LE, GT, LT, NE, EQ, AND, OR;
+terminal PLUS, MINUS, TIMES, DIV, MOD, POW, SQRT;
+terminal String BOOLEANO, FLUTUANTE, INTEIRO, TEXTO, ID, ID_CLASSE;
+
+/* ---------- Não-terminais ---------- */
+non terminal programa, membros, membro, modificadores, modificador;
+non terminal declaracao, bloco, comandos, comando, senao;
+non terminal String tipo, variavel, expr;
+
+/* ---------- Precedência (da menor para a maior) ---------- */
+precedence left OR;
+precedence left AND;
+precedence nonassoc EQ, NE, GT, LT, GE, LE;
+precedence left PLUS, MINUS;
+precedence left TIMES, DIV, MOD;
+precedence right POW;
+precedence right SQRT;
+
+start with programa;
+
+/* ---------- Gramática ---------- */
+programa      ::= modificadores CLASS ID_CLASSE ABRE_BLOCO membros FECHA_BLOCO;
+
+membros       ::=
+              | membros membro
+              ;
+
+membro        ::= modificadores declaracao
+              | modificadores VOID MAIN PAREN PAREN bloco
+              | error FIM
+              ;
+
+modificadores ::=
+              | modificadores modificador
+              ;
+
+modificador   ::= PUBLIC | PRIVATE | FINAL | STATIC;
+
+tipo          ::= T_BOOLEAN {: RESULT = Parser.BOOLEAN; :}
+              | T_STRING    {: RESULT = Parser.STRING;  :}
+              | T_INT       {: RESULT = Parser.INT;     :}
+              | T_FLOAT     {: RESULT = Parser.FLOAT;   :}
+              ;
+
+declaracao    ::= MAO_ABRE ID:n PILULA tipo:t MAO_FECHA FIM
+                  {: parser.declarar(n, t, nleft); :}
+              | MAO_ABRE ID:n PILULA tipo:t MAO_FECHA ASSIGN expr:e FIM
+                  {: parser.declarar(n, t, nleft); parser.checarAtribuicao(t, e, n, nleft); :}
+              ;
+
+variavel      ::= MAO_ABRE ID:n MAO_FECHA
+                  {: RESULT = parser.tipoDe(n, nleft); :}
+              ;
+
+bloco         ::= ABRE_BLOCO comandos FECHA_BLOCO;
+
+comandos      ::=
+              | comandos comando
+              ;
+
+comando       ::= declaracao
+              | MAO_ABRE ID:n MAO_FECHA ASSIGN expr:e FIM
+                  {: parser.checarAtribuicao(parser.tipoDe(n, nleft), e, n, nleft); :}
+              | INPUT variavel FIM
+              | OUTPUT expr FIM
+              | IF:i PAREN expr:e PAREN bloco senao
+                  {: parser.condicao(e, "meow (if)", ileft); :}
+              | WHILE:w PAREN expr:e PAREN bloco
+                  {: parser.condicao(e, "rrr-rrr (while)", wleft); :}
+              | RETURN:r expr FIM
+                  {: parser.semantico(rleft, "O método 0w0 (void) não pode retornar valor"); :}
+              | RETURN FIM
+              | error FIM
+              ;
+
+senao         ::=
+              | ELSE bloco
+              ;
+
+expr          ::= expr:a OR expr:b   {: RESULT = parser.logico(a, b, "~w~", aleft); :}
+              | expr:a AND expr:b    {: RESULT = parser.logico(a, b, "&w&", aleft); :}
+              | expr:a EQ expr:b     {: RESULT = parser.relacional(a, b, "=w=", aleft); :}
+              | expr:a NE expr:b     {: RESULT = parser.relacional(a, b, "!w!", aleft); :}
+              | expr:a GT expr:b     {: RESULT = parser.relacional(a, b, ">wo", aleft); :}
+              | expr:a LT expr:b     {: RESULT = parser.relacional(a, b, "ow<", aleft); :}
+              | expr:a GE expr:b     {: RESULT = parser.relacional(a, b, ">=w=", aleft); :}
+              | expr:a LE expr:b     {: RESULT = parser.relacional(a, b, "<=w=", aleft); :}
+              | expr:a PLUS expr:b   {: RESULT = parser.aritmetico(a, b, "+w+", aleft); :}
+              | expr:a MINUS expr:b  {: RESULT = parser.aritmetico(a, b, "-w-", aleft); :}
+              | expr:a TIMES expr:b  {: RESULT = parser.aritmetico(a, b, "*w*", aleft); :}
+              | expr:a DIV expr:b    {: RESULT = parser.aritmetico(a, b, "/w/", aleft); :}
+              | expr:a MOD expr:b    {: RESULT = parser.aritmetico(a, b, "%w%", aleft); :}
+              | expr:a POW expr:b    {: RESULT = parser.aritmetico(a, b, "^w^", aleft); :}
+              | SQRT:s expr:a        {: RESULT = parser.raiz(a, sleft); :}
+              | PAREN expr:e PAREN   {: RESULT = e; :}
+              | INTEIRO              {: RESULT = Parser.INT; :}
+              | FLUTUANTE            {: RESULT = Parser.FLOAT; :}
+              | BOOLEANO             {: RESULT = Parser.BOOLEAN; :}
+              | TEXTO                {: RESULT = Parser.STRING; :}
+              | variavel:v           {: RESULT = v; :}
+              ;
